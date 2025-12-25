@@ -44,7 +44,6 @@
 
 #include "src/slurmctld/licenses.h"
 #ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
-
 bool enable_check_quota;
 #endif
 

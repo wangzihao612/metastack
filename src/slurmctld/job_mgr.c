@@ -149,7 +149,6 @@ static pthread_mutex_t get_jobid_lock = PTHREAD_MUTEX_INITIALIZER;
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 #define  JOB_SUBMIT_SRUN 0x010
 #endif
-
 typedef enum {
 	JOB_HASH_JOB,
 	JOB_HASH_ARRAY_JOB,
