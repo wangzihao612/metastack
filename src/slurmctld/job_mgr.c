@@ -149,6 +149,12 @@ static pthread_mutex_t get_jobid_lock = PTHREAD_MUTEX_INITIALIZER;
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 #define  JOB_SUBMIT_SRUN 0x010
 #endif
+
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+#ifdef __METASTACK_OPT_HIGH_THROUGHPUT_EPILOG_PARALLEL
+static pthread_mutex_t epilog_para_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+#endif
 typedef enum {
 	JOB_HASH_JOB,
 	JOB_HASH_ARRAY_JOB,
@@ -17738,6 +17744,33 @@ extern bool job_epilog_complete(uint32_t job_id, char *node_name,
 	node_ptr = find_node_record(node_name);
 	if (node_ptr)
 		make_node_idle(node_ptr, job_ptr);
+#endif
+
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+#ifdef __METASTACK_OPT_HIGH_THROUGHPUT_EPILOG_PARALLEL
+	if (enable_check_quota) {
+		if (epilog_para) {
+			slurm_mutex_lock(&epilog_para_lock);
+			if (bit_test(alloc_node_bitmap, node_ptr->index)) {
+				bit_clear(alloc_node_bitmap, node_ptr->index);
+			}
+			slurm_mutex_unlock(&epilog_para_lock);
+		} else {
+			if (bit_test(alloc_node_bitmap, node_ptr->index)) {
+				bit_clear(alloc_node_bitmap, node_ptr->index);
+			}
+		}
+		log_flag(SELECT_TYPE, "%s: update alloc_node_bitmap: %s", __func__, bitmap2node_name(bb_node_bitmap));
+	}
+#else
+	if (enable_check_quota) {
+		if (bit_test(bb_node_bitmap, node_ptr->index)) {
+			bit_clear(bb_node_bitmap, node_ptr->index);
+			node_bb_count[node_ptr->index] -= 1;
+		}
+		log_flag(SELECT_TYPE, "%s: update bb_node_bitmap: %s", __func__, bitmap2node_name(bb_node_bitmap));
+	}
+#endif
 #endif
 
 #ifdef __METASTACK_OPT_CACHE_QUERY
