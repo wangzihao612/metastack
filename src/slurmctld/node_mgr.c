@@ -110,6 +110,10 @@ typedef struct {
 } pack_node_info_t;
 
 /* Global variables */
+//#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+//bitstr_t *bb_node_bitmap = NULL;	/* bitmap of alloced nodes */
+//uint32_t node_bb_count[node_record_count] = {0};
+//#endif
 bitstr_t *avail_node_bitmap = NULL;	/* bitmap of available nodes */
 bitstr_t *bf_ignore_node_bitmap = NULL; /* bitmap of nodes to ignore during a
 					 * backfill cycle */
@@ -832,6 +836,9 @@ extern int load_all_node_state ( bool state_only )
 			node_ptr->gpu_spec_bitmap =
 				node_state_rec->gpu_spec_bitmap;
 			node_state_rec->gpu_spec_bitmap = NULL;
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+			node_ptr->bb_cache_grp_cnt = node_state_rec->bb_cache_grp_cnt;
+#endif
 		} else {
 			if ((!power_save_mode) &&
 			    ((node_state & NODE_STATE_POWERED_DOWN) ||
@@ -908,6 +915,9 @@ extern int load_all_node_state ( bool state_only )
 			xfree(node_ptr->mcs_label);
 			node_ptr->mcs_label = node_state_rec->mcs_label;
 			node_state_rec->mcs_label = NULL;
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+			node_ptr->bb_cache_grp_cnt = node_state_rec->bb_cache_grp_cnt;
+#endif
 		}
 
 		if (node_ptr) {
@@ -1358,6 +1368,9 @@ static void _pack_node(node_record_t *dump_node_ptr, buf_t *buffer,
 		pack32(dump_node_ptr->cpu_load, buffer);
 		pack64(dump_node_ptr->free_mem, buffer);
 		pack32(dump_node_ptr->config_ptr->weight, buffer);
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+		pack32(dump_node_ptr->bb_cache_grp_cnt, buffer);
+#endif
 		pack16(dump_node_ptr->res_cores_per_gpu, buffer);
 		pack32(dump_node_ptr->reason_uid, buffer);
 
