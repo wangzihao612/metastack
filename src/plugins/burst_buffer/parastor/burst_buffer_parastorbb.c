@@ -2648,10 +2648,8 @@ static void _queue_teardown(bb_job_t *bb_job, job_record_t *job_ptr, bool *clean
 			}
 		}
 #endif
-		*clean_finish = false;
+		clean_finish = false;
 	}
-		
-
 	//slurm_thread_create_detached(_start_teardown, bb_job);
 }
 
@@ -3064,10 +3062,12 @@ extern int bb_p_job_begin(job_record_t *job_ptr)
 	} 
 
 	/* Handle count before creating cache */
-	bb_state.bb_config.free_groups    -= job_ptr->need_group_counts;
-	bb_state.bb_config.free_datasets  -= job_ptr->need_database_counts;
-	bb_state.bb_config.used_groups    += job_ptr->need_group_counts;
-	bb_state.bb_config.used_datasets  += job_ptr->need_database_counts;
+	bb_state.bb_config.free_groups		-= job_ptr->need_group_counts;
+	bb_state.bb_config.free_datasets	-= job_ptr->need_database_counts;
+	bb_state.bb_config.used_groups		+= job_ptr->need_group_counts;
+	bb_state.bb_config.used_datasets	+= job_ptr->need_database_counts;
+	bb_job->index_groups				=  job_ptr->need_group_counts;
+	bb_job->index_datasets				=  job_ptr->need_database_counts;
 #ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
 	/* * NOTE: job_ptr is guaranteed to be valid here based on previous code.
 	* bb_state is a global, no need to check address.
