@@ -1846,6 +1846,9 @@ _unpack_node_info_members(node_info_t * node, buf_t *buffer,
 #ifdef __METASTACK_NEW_MAIN_SCHED_PLANNED
 		safe_unpackbool(&node->main_planned_flag, buffer);
 #endif
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+		safe_unpack32(&node->bb_cache_grp_cnt, buffer);
+#endif
 	} else if (protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		safe_unpackstr(&node->name, buffer);
 		safe_unpackstr(&node->node_hostname, buffer);

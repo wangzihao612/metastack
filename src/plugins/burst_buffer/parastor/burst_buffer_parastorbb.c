@@ -2582,14 +2582,69 @@ extern time_t bb_p_job_get_est_start(job_record_t *job_ptr)
 // 	return NULL;
 // }
 
-static void _queue_teardown(bb_job_t *bb_job, bool *clean_finish)
+static void _queue_teardown(bb_job_t *bb_job, job_record_t *job_ptr, bool *clean_finish)
 {
-	if(clean_finish) {
+	if(*clean_finish) {
 		bb_state.bb_config.free_groups 				+= bb_job->index_groups;
 		bb_state.bb_config.used_groups				-= bb_job->index_groups;
 		bb_state.bb_config.free_datasets			+= bb_job->index_datasets;
 		bb_state.bb_config.used_datasets			-= bb_job->index_datasets;
-		clean_finish = false;
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+		// 仅当传入了有效的 job_ptr 时才执行节点配额释放
+		if (job_ptr) {
+			uint32_t bb_quota = 4; // 默认值
+			bitstr_t *node_bitmap = NULL;
+
+			// 1. 获取配额配置
+			if (bb_state.bb_config.max_clients_join > 0) {
+				bb_quota = bb_state.bb_config.max_clients_join;
+				debug3("Using max_clients_join from config as bb_quota: %u", bb_quota);
+			} else {
+				debug3("max_clients_join not set, using default bb_quota: 4");
+			}
+
+			// 2. 确定使用哪个节点位图 
+			// 优先使用 job_resrcs 中的位图(在作业清理阶段最稳定)，如果没有则尝试使用 job_ptr 自带的位图
+			if (job_ptr->job_resrcs && job_ptr->job_resrcs->node_bitmap) {
+				node_bitmap = job_ptr->job_resrcs->node_bitmap;
+			} else if (job_ptr->node_bitmap) {
+				node_bitmap = job_ptr->node_bitmap;
+			}
+
+			// 3. 遍历节点并释放计数
+			if (node_bitmap) {
+				int i, i_first, i_last;
+				i_first = bit_ffs(node_bitmap);
+				i_last  = bit_fls(node_bitmap);
+
+				if (i_first != -1) {
+					for (i = i_first; i <= i_last; i++) {
+						if (!bit_test(node_bitmap, i)) {
+							continue;
+						}
+						node_record_t *node_ptr = node_record_table_ptr[i];
+						// 节点有效性检查
+						if (!node_ptr || !node_ptr->name) {
+							continue;
+						}
+						// 计数递减 (防止下溢)
+						if (node_ptr->bb_cache_grp_cnt > 0) {
+							node_ptr->bb_cache_grp_cnt--;
+							debug3("Teardown: Node %s (idx %d) BB count decremented to %u (quota=%u) for job %pJ",
+								node_ptr->name, i, node_ptr->bb_cache_grp_cnt, bb_quota, job_ptr);
+						} else {
+							// 如果已经是0还在减，说明逻辑有误，打印错误但不崩溃
+							debug("Error: Node %s (idx %d) BB count underflow attempt for job %pJ", 
+								node_ptr->name, i, job_ptr);
+						}
+					}
+				}
+			} else {
+				debug("Teardown: No node bitmap found for job %pJ, skipping quota release", job_ptr);
+			}
+		}
+#endif
+		*clean_finish = false;
 	}
 		
 
@@ -3008,7 +3063,60 @@ extern int bb_p_job_begin(job_record_t *job_ptr)
 	bb_state.bb_config.free_datasets  -= job_ptr->need_database_counts;
 	bb_state.bb_config.used_groups    += job_ptr->need_group_counts;
 	bb_state.bb_config.used_datasets  += job_ptr->need_database_counts;
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+	/* * NOTE: job_ptr is guaranteed to be valid here based on previous code.
+	* bb_state is a global, no need to check address.
+	 */
+	if (job_ptr->node_bitmap) { // 仅当节点位图存在时执行
+		int i, i_first, i_last;
+		node_record_t *node_ptr = NULL;
+		uint32_t bb_quota = 4; // 默认值
 
+		// 获取配额配置
+		if (bb_state.bb_config.max_clients_join > 0) {
+			bb_quota = bb_state.bb_config.max_clients_join;
+			debug3("Using max_clients_join from config as bb_quota: %u", bb_quota);
+		} else {
+			debug3("max_clients_join not set, using default bb_quota: 4");
+		}
+
+		i_first = bit_ffs(job_ptr->node_bitmap);
+		i_last  = bit_fls(job_ptr->node_bitmap);
+
+		if (i_first != -1) { // 确保位图非空
+			for (i = i_first; i <= i_last; i++) {
+				if (!bit_test(job_ptr->node_bitmap, i)) {
+					continue;
+				}
+
+				// 直接访问全局节点表
+				node_ptr = node_record_table_ptr[i];
+
+				// 安全检查
+				if (!node_ptr || !node_ptr->name) {
+					continue;
+				}
+
+				// 检查配额 (仅记录日志，若需阻断需在此处添加逻辑)
+				if (node_ptr->bb_cache_grp_cnt >= bb_quota) {
+					// 警告：当前仅仅是打印日志，作业仍会继续运行并占用配额
+					info("WARNING: Node %s (idx %d) BB quota reached (%u/%u) but job %pJ is proceeding.",
+						 node_ptr->name, i, node_ptr->bb_cache_grp_cnt, bb_quota, job_ptr);
+				}
+
+				// 更新计数
+				if (node_ptr->bb_cache_grp_cnt < UINT32_MAX) {
+					node_ptr->bb_cache_grp_cnt++;
+					debug3("Node %s BB count incremented to %u for job %pJ", 
+					   node_ptr->name, node_ptr->bb_cache_grp_cnt, job_ptr);
+				}
+			}
+		}
+	} else {
+		debug3("Job %pJ has no node map, skip BB quota update", job_ptr);
+		// 不可以直接 return，必须往下走去解锁！
+	}
+#endif
 	//job_ptr->bb_enable_pb			   = true;	
 	slurm_mutex_unlock(&bb_state.bb_mutex);
 
