@@ -2650,6 +2650,7 @@ static void _queue_teardown(bb_job_t *bb_job, job_record_t *job_ptr, bool *clean
 #endif
 		*clean_finish = false;
 	}
+		
 	//slurm_thread_create_detached(_start_teardown, bb_job);
 }
 
@@ -3121,7 +3122,8 @@ extern int bb_p_job_begin(job_record_t *job_ptr)
 		debug3("Job %pJ has no node map, skip BB quota update", job_ptr);
 		// 不可以直接 return，必须往下走去解锁！
 	}
-#endif	/*
+#endif	
+	/*
 	 * Create bb allocation for the job now. Check if it has already been
 	 * created (perhaps it was created but then slurmctld restarted).
 	 * bb_alloc is the structure that is state saved.
