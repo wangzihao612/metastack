@@ -2648,7 +2648,7 @@ static void _queue_teardown(bb_job_t *bb_job, job_record_t *job_ptr, bool *clean
 			}
 		}
 #endif
-		clean_finish = false;
+		*clean_finish = false;
 	}
 	//slurm_thread_create_detached(_start_teardown, bb_job);
 }
