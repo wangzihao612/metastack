@@ -3804,6 +3804,9 @@ typedef struct slurm_update_node_msg {
 	uint32_t resume_after;	/* automatically resume DOWN or DRAINED node
 				 * after this amount of seconds */
 	uint32_t weight;	/* new weight for node */
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+	uint32_t bb_cache_grp_cnt;	/* cache group count of node*/
+#endif
 } update_node_msg_t;
 
 typedef struct slurm_update_front_end_msg {

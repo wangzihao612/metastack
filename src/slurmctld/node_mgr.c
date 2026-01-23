@@ -2202,6 +2202,14 @@ int update_node(update_node_msg_t *update_node_msg, uid_t auth_uid)
 			}
 		}
 
+#ifdef __METASTACK_OPT_SCHE_CHECK_BBQUOTA
+		if (update_node_msg->bb_cache_grp_cnt != NO_VAL) {
+			node_ptr->bb_cache_grp_cnt = update_node_msg->bb_cache_grp_cnt;
+			debug3("update_node: setting bb_cache_grp_cnt to %u for node %s",
+				node_ptr->bb_cache_grp_cnt, this_node_name);
+		}
+#endif
+
 		if (update_node_msg->comment) {
 			xfree(node_ptr->comment);
 			if (update_node_msg->comment[0])

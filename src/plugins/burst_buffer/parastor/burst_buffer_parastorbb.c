@@ -226,7 +226,7 @@ pthread_mutex_t parastor_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Function prototypes */
 static bb_job_t *_get_bb_job(job_record_t *job_ptr);
-static void _queue_teardown(bb_job_t *bb_job, bool *clean_finish);
+static void _queue_teardown(bb_job_t *bb_job, job_record_t *job_ptr, bool *clean_finish);
 // static void _fail_stage(stage_args_t *stage_args, const char *op, int rc, char *resp_msg);
 // static void _init_data_in_argv(stage_args_t *stage_args, int *argc_p, char ***argv_p);
 static int _bb_get_parastors_state(void);
@@ -730,7 +730,7 @@ static void *_start_stage_out(void *x)
 				bb_alloc->state = BB_STATE_STAGED_IN;
 			}
 		}
-		_queue_teardown(bb_job, &job_ptr->clean_finish);
+		_queue_teardown(bb_job, job_ptr, &job_ptr->clean_finish);
 		slurm_mutex_unlock(&bb_state.bb_mutex);
 	}
 	unlock_slurmctld(job_write_lock);
@@ -1905,7 +1905,7 @@ static void _recover_job_bb(job_record_t *job_ptr, bb_alloc_t *bb_alloc,
 		log_flag(BURST_BUF, "Purging buffer for pending %pJ",
 			job_ptr);
 		bb_set_job_bb_state(job_ptr, bb_job, BB_STATE_TEARDOWN);
-		_queue_teardown(bb_job,  &job_ptr->clean_finish);
+		_queue_teardown(bb_job, job_ptr, &job_ptr->clean_finish);
 		if (job_ptr->details &&
 			(job_ptr->details->begin_time < defer_time)) {
 			job_ptr->details->begin_time = defer_time;
@@ -1933,7 +1933,7 @@ static void _recover_job_bb(job_record_t *job_ptr, bb_alloc_t *bb_alloc,
 	case BB_STATE_TEARDOWN_FAIL:
 		log_flag(BURST_BUF, "Restarting burst buffer teardown for %pJ",
 			job_ptr);
-		_queue_teardown(bb_job, &job_ptr->clean_finish);
+		_queue_teardown(bb_job, job_ptr, &job_ptr->clean_finish);
 		break;
 	case BB_STATE_COMPLETE:
 		/*
@@ -1979,7 +1979,7 @@ static void _purge_vestigial_bufs(void)
 				/* For parastorbb, try to find bb_job first */
 				bb_job_t *bb_job = bb_job_find(&bb_state, bb_alloc->job_id);
 				if (bb_job) {
-					_queue_teardown(bb_job,  &job_ptr->clean_finish);
+					_queue_teardown(bb_job, job_ptr, &job_ptr->clean_finish);
 				} else {
 					/* No bb_job found, use bb_alloc to clean up resources */
 					info("Job and bb_job not found for JobId=%u, cleaning up resources from bb_alloc",
@@ -2819,7 +2819,7 @@ static int _alloc_job_bb(job_record_t *job_ptr, bb_job_t *bb_job,
 		rc = _queue_stage_in(job_ptr, bb_job);
 		if (rc != SLURM_SUCCESS) {
 			bb_set_job_bb_state(job_ptr, bb_job, BB_STATE_TEARDOWN);
-			_queue_teardown(bb_job,  &job_ptr->clean_finish);
+			_queue_teardown(bb_job, job_ptr, &job_ptr->clean_finish);
 		}
 	}
 	return rc;
@@ -3183,7 +3183,7 @@ extern int bb_p_job_start_stage_out(job_record_t *job_ptr)
 	} else if (bb_job->state < BB_STATE_RUNNING) {
 		/* Job never started. Just teardown the buffer */
 		bb_set_job_bb_state(job_ptr, bb_job, BB_STATE_TEARDOWN);
-		_queue_teardown(bb_job, &job_ptr->clean_finish);
+		_queue_teardown(bb_job, job_ptr, &job_ptr->clean_finish);
 	} else if (bb_job->state < BB_STATE_POST_RUN) {
 		_pre_queue_stage_out(job_ptr, bb_job);
 	}
@@ -3340,7 +3340,7 @@ extern int bb_p_job_cancel(job_record_t *job_ptr)
 			bb_alloc->state_time = time(NULL);
 			bb_state.last_update_time = time(NULL);
 		}
-		_queue_teardown(bb_job,  &job_ptr->clean_finish);
+		_queue_teardown(bb_job, job_ptr, &job_ptr->clean_finish);
 	}
 	slurm_mutex_unlock(&bb_state.bb_mutex);
 
